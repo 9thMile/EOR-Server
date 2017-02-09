@@ -1,3 +1,4 @@
+import paho.mqtt.publish as publish
 from array import *
 import sys
 import os
@@ -18,7 +19,7 @@ import logging
 import logging.handlers
 
 #Set the version 
-S_Version = "1.1-8"
+S_Version = "1.2-0"
 
 
 EOS_String = ""
@@ -73,6 +74,12 @@ class Station:
     FlashLED3 = False
     FlashLED4 = False
     FlashLED5 = False
+    Name = "EOS_Station"
+    Broker_Address = ''
+    Broker_Port = ''
+    Broker_USN = ''
+    Broker_PWD = ''
+    FanState = ''
 
 ## Define the address bytes
 class ADDRESS:
@@ -483,6 +490,7 @@ class WeatherPoller(threading.Thread):
                                             else:
                                                 eor_log.debug(a)
                                         setFan(0)
+                                        fanState = 'Off'
                                         eor_log.info("Station fan is OFF")
                                     elif Station.Update == 3:
                                         a = "Update STATION SET STR_Value = 'Fan On' where LABEL = 'HAS_FAN'"
@@ -495,6 +503,7 @@ class WeatherPoller(threading.Thread):
                                             else:
                                                 eor_log.debug(a)
                                         setFan(1)
+                                        fanState ='On'
                                         eor_log.info("Station fan is ON")
                                     #Clear the flag                                   
                                     a = "Update STATION SET INT_VALUE = 0 where LABEL = 'DO_UPDATE'"
@@ -506,6 +515,22 @@ class WeatherPoller(threading.Thread):
                                             eor_log.info(a + "/" + e)
                                         else:
                                             eor_log.debug(a)
+
+                                    ##MMQT
+                                    if eosu.getsetting(db, "BROKER_ADDRESS",0) <> "":
+                                        try:
+                                            Station.Name  = eosu.getsetting(db, "NAME", 0)
+                                            Station.Broker_Address = eosu.getsetting(db, "BROKER_ADDRESS", 0)
+                                            Station.Broker_Port = eosu.getsetting(db, "BROKER_PORT", 0)
+                                            Station.Broker_USN = eosu.getsetting(db, "BROKER_USN", 0)
+                                            Station.Broker_PWD = eosu.getsetting(db, "BROKER_PWD", 0)
+                                            auth = {'username':Station.Broker_USN,'password':Station.Broker_PWD}
+                                            publish.single(topic= Station.Name + '/Status/Fan',payload=fanState,qos=0,retain=True, hostname=Station.Broker_Address,port=Station.Broker_Port,client_id='EOS_Station',auth=auth)
+                                            sleep(5)
+                                        except:
+                                            eor_log.error('Error sending MQTT Message')
+
+
                                     #restart station
                                     ser.write("SE-O 48" + chr(13))
                                     eor_log.info("Set station for EOS Output - will continue to read data")
@@ -559,7 +584,13 @@ def getSettings():
         Station.Board_Count = eosu.getsetting(db, "BOARD_COUNT", 1)
         Station.Error_Level = eosu.getsetting(db, "ERROR_LEVEL", 1)
         Station.ID = eosu.getsetting(db,"STAT_ID",1)
-        
+        Station.Name  = eosu.getsetting(db, "NAME", 0)
+        Station.Broker_Address = eosu.getsetting(db, "BROKER_ADDRESS", 0)
+        Station.Broker_Port = eosu.getsetting(db, "BROKER_PORT", 0)
+        Station.Broker_USN = eosu.getsetting(db, "BROKER_USN", 0)
+        Station.Broker_PWD = eosu.getsetting(db, "BROKER_PWD", 0)
+        Station.FanState = eosu.getsetting(db, "HAS_FAN",0)
+
         return True
     except Exception, e:
         eor_log.error("Setting Update issue : " + str(e))
@@ -634,7 +665,16 @@ def main():
                         eor_log.info(a + "/" + e)
                     else:
                         eor_log.info(a)
-
+           ##MMQT
+            if Station.Broker_Address <> "":
+                try:
+                    auth = {'username':Station.Broker_USN,'password':Station.Broker_PWD}
+                    publish.single(topic= Station.Name + '/Version/Software/EOR',payload=S_Version,qos=0,retain=True, hostname=Station.Broker_Address,port=Station.Broker_Port,client_id='EOS_Station',auth=auth)
+                    sleep(5)
+                    publish.single(topic= Station.Name + '/Status/Fan',payload=Station.FanState,qos=0,retain=True, hostname=Station.Broker_Address,port=Station.Broker_Port,client_id='EOS_Station',auth=auth)
+                    sleep(5)
+                except:
+                    eor_log.error('Error4 sending MQTT Message')
             cur.execute("Delete from FEED")
             db.commit()
             eor_log.info("FEED table has been truncated")
