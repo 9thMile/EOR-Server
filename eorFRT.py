@@ -1,3 +1,4 @@
+import paho.mqtt.publish as publish
 from array import *
 import sys
 import os
@@ -169,7 +170,11 @@ class Station:
     Msg_Count = 0
     Altitude = 0
     Update = 0
-
+    Name = "EOS_Station"
+    Broker_Address = ''
+    Broker_Port = ''
+    Broker_USN = ''
+    Broker_PWD = ''  
 
 ## Define the address bytes
 class ADDRESS:
@@ -711,6 +716,11 @@ def getSettings():
         Station.Error_Level = eosu.getsetting(db, "ERROR_LEVEL", 1)
         Station.ID = eosu.getsetting(db,"STAT_ID",1)
         Station.Altitude = eosu.getsetting(db,"ALTITUDE",1)
+        Station.Name  = eosu.getsetting(db, "NAME", 0)
+        Station.Broker_Address = eosu.getsetting(db, "BROKER_ADDRESS", 0)
+        Station.Broker_Port = eosu.getsetting(db, "BROKER_PORT", 0)
+        Station.Broker_USN = eosu.getsetting(db, "BROKER_USN", 0)
+        Station.Broker_PWD = eosu.getsetting(db, "BROKER_PWD", 0)
         
         
         return True
@@ -790,7 +800,12 @@ def main():
                         eor_log.info(a + "/" + e)
                     else:
                         eor_log.info(a)
-
+           ##MMQT
+            if Station.Broker_Address <> "":
+                auth = {'username':Station.Broker_USN,'password':Station.Broker_PWD}
+                publish.single(topic= Station.Name + '/Version/Software/EOR',payload=S_Version,qos=0,retain=True, hostname=Station.Broker_Address,port=Station.Broker_Port,client_id='EOS_Station',auth=auth)
+                sleep(5)
+                
             cur.execute("Delete from FEED")
             db.commit()
             eor_log.info("FEED table has been truncated")
