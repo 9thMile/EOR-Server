@@ -19,7 +19,7 @@ import logging
 import logging.handlers
 
 #Set the version 
-S_Version = "1.2-0"
+S_Version = "1.2-1"
 
 
 EOS_String = ""
